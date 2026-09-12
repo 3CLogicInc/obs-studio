@@ -675,8 +675,6 @@ static int obs_init_video(struct obs_video_info *ovi)
 		return OBS_VIDEO_FAIL;
 	if (pthread_mutex_init(&video->encoder_group_mutex, NULL) < 0)
 		return OBS_VIDEO_FAIL;
-	if (pthread_mutex_init(&video->mixes_mutex, NULL) < 0)
-		return OBS_VIDEO_FAIL;
 
 	if (!obs_view_add2(&obs->data.main_view, ovi))
 		return OBS_VIDEO_FAIL;
@@ -805,9 +803,6 @@ static void obs_free_video(void)
 	if (num_views > 0)
 		blog(LOG_WARNING, "Number of remaining views: %ld", num_views);
 	pthread_mutex_unlock(&obs->video.mixes_mutex);
-
-	pthread_mutex_destroy(&obs->video.mixes_mutex);
-	pthread_mutex_init_value(&obs->video.mixes_mutex);
 
 	for (size_t i = 0; i < obs->video.ready_encoder_groups.num; i++) {
 		obs_weak_encoder_release(obs->video.ready_encoder_groups.array[i]);
@@ -1359,6 +1354,8 @@ void obs_shutdown(void)
 	obs_free_data();
 	obs_free_audio();
 	obs_free_video();
+	pthread_mutex_destroy(&obs->video.mixes_mutex);
+	pthread_mutex_init_value(&obs->video.mixes_mutex);
 	os_task_queue_destroy(obs->destruction_task_thread);
 	obs_free_hotkeys();
 	obs_free_graphics();
