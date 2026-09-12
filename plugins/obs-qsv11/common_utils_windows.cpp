@@ -15,11 +15,14 @@
  * Windows implementation of OS-specific utility functions
  */
 
+struct win_session_data {
+	mfxLoader loader;
+};
+
 mfxStatus Initialize(mfxVersion ver, mfxSession *pSession, mfxFrameAllocator *pmfxAllocator, mfxHDL *deviceHandle,
 		     bool bCreateSharedHandles, enum qsv_codec codec, void **data)
 {
 	UNUSED_PARAMETER(codec);
-	UNUSED_PARAMETER(data);
 
 	obs_video_info ovi;
 	obs_get_video_info(&ovi);
@@ -71,7 +74,15 @@ mfxStatus Initialize(mfxVersion ver, mfxSession *pSession, mfxFrameAllocator *pm
 		MFXSetConfigFilterProperty(cfg, (const mfxU8 *)"mfxImplDescription.AccelerationMode", impl);
 
 		sts = MFXCreateSession(loader, adapter_idx, pSession);
-		MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+		if (sts != MFX_ERR_NONE) {
+			MFXUnload(loader);
+			return sts;
+		}
+		if (data) {
+			struct win_session_data *d = (struct win_session_data *)bzalloc(sizeof(*d));
+			d->loader = loader;
+			*data = d;
+		}
 
 		// Create DirectX device context
 		if (deviceHandle == NULL || *deviceHandle == NULL) {
@@ -115,7 +126,15 @@ mfxStatus Initialize(mfxVersion ver, mfxSession *pSession, mfxFrameAllocator *pm
 		MFXSetConfigFilterProperty(cfg, (const mfxU8 *)"mfxImplDescription.AccelerationMode", impl);
 
 		sts = MFXCreateSession(loader, adapter_idx, pSession);
-		MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+		if (sts != MFX_ERR_NONE) {
+			MFXUnload(loader);
+			return sts;
+		}
+		if (data) {
+			struct win_session_data *d = (struct win_session_data *)bzalloc(sizeof(*d));
+			d->loader = loader;
+			*data = d;
+		}
 	}
 	return sts;
 }
@@ -125,7 +144,15 @@ void Release()
 	CleanupHWDevice();
 }
 
-void ReleaseSessionData(void *) {}
+void ReleaseSessionData(void *data)
+{
+	struct win_session_data *d = (struct win_session_data *)data;
+	if (d) {
+		if (d->loader)
+			MFXUnload(d->loader);
+		bfree(d);
+	}
+}
 
 void mfxGetTime(mfxTime *timestamp)
 {

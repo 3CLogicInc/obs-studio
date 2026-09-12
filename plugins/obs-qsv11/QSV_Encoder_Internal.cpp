@@ -896,13 +896,19 @@ mfxStatus QSV_Encoder_Internal::ClearData()
 		g_numEncodersOpen--;
 	}
 
+	// Close the session before any D3D device teardown: its scheduler still
+	// references the device, and skipping MFXClose abandons the runtime's
+	// ~10-thread worker pool on every encoder teardown (upstream never closes).
+	MFXVideoENCODE_Close(m_session);
+	MFXClose(m_session);
+	m_session = NULL;
+	ReleaseSessionData(m_sessionData);
+	m_sessionData = NULL;
+
 	if ((m_bUseTexAlloc) && (g_numEncodersOpen <= 0)) {
 		Release();
 		g_GFX_Handle = NULL;
 	}
-	MFXVideoENCODE_Close(m_session);
-	ReleaseSessionData(m_sessionData);
-	m_sessionData = NULL;
 	return sts;
 }
 
